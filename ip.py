@@ -77,14 +77,13 @@ def preserve_table():
 @app.route("/add_my_ip", methods=["GET"])
 def add_my_ip():
     simple_protect()
-    # Mantem ips cadastrados
-    preserve_table()
     ipcliente = request.remote_addr, 200
     ipcliente = ipcliente[0]
     if ipcliente in open('ips.txt').read():
-        drop_ssh()
         return jsonify({'status': 'ip cadastrado'})
         exit(0)
+    # Mantem ips cadastrados
+    preserve_table()
     save_ip   = open("ips.txt", "a")
     save_ip.write(ipcliente + "\n")
     save_ip.close()
