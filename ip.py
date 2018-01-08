@@ -5,6 +5,7 @@ from flask import Flask
 import iptc
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'batata'
 
 
 interface = "wlp2s0"
@@ -13,13 +14,22 @@ interface = "wlp2s0"
 def hello():
     return 500
 
+def simple_protect():
+    secret = request.args.get('secret')
+    if secret == "batata":
+        return "OK"
+    else:
+        exit(0)
+
 @app.route("/get_my_ip", methods=["GET"])
 def get_my_ip():
+    simple_protect()
     ipcliente = jsonify({'ip': request.remote_addr}), 200
     return ipcliente
 
 @app.route("/flush_ip", methods=["GET"])
 def flush_ip():
+    simple_protect()
     tb = iptc.Table(iptc.Table.FILTER)
     c = iptc.Chain(tb, 'INPUT')
     c.flush()
@@ -66,6 +76,7 @@ def preserve_table():
 
 @app.route("/add_my_ip", methods=["GET"])
 def add_my_ip():
+    simple_protect()
     # Mantem ips cadastrados
     preserve_table()
     ipcliente = request.remote_addr, 200
@@ -108,6 +119,7 @@ def add_ip(ipcliente):
 
 @app.route("/del_ip", methods=["GET"])
 def del_ip():
+    simple_protect()
     ipcliente = request.remote_addr, 200
     rule = iptc.Rule()
     rule.in_interface = interface
