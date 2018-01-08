@@ -82,8 +82,8 @@ def add_my_ip():
     ipcliente = request.remote_addr, 200
     ipcliente = ipcliente[0]
     if ipcliente in open('ips.txt').read():
-        return jsonify({'status': 'ip cadastrado'})
         drop_ssh()
+        return jsonify({'status': 'ip cadastrado'})
         exit(0)
     save_ip   = open("ips.txt", "a")
     save_ip.write(ipcliente + "\n")
