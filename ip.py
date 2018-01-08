@@ -8,7 +8,8 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'batata'
 
 
-interface = "wlp2s0"
+interface  = "eth0"
+port_block = "9947"
 
 @app.route("/")
 def hello():
@@ -27,7 +28,19 @@ def get_my_ip():
     ipcliente = jsonify({'ip': request.remote_addr}), 200
     return ipcliente
 
-@app.route("/flush_ip", methods=["GET"])
+@app.route("/flush_all", methods=["GET"])
+def flush_all():
+    simple_protect()
+    tb = iptc.Table(iptc.Table.FILTER)
+    c = iptc.Chain(tb, 'INPUT')
+    c.flush()
+    allow_loopback()
+    allow_established()
+    clear = open("ips.txt", "w")
+    clear.write("127.0.0.1" + "\n")
+    clear.close()
+    return jsonify({'status': 'flush'})
+
 def flush_ip():
     simple_protect()
     tb = iptc.Table(iptc.Table.FILTER)
@@ -80,7 +93,7 @@ def add_my_ip():
     ipcliente = request.remote_addr, 200
     ipcliente = ipcliente[0]
     if ipcliente in open('ips.txt').read():
-        return jsonify({'status': 'ip cadastrado'})
+        return jsonify({'status': 'ip ja cadastrado'})
         exit(0)
     # Mantem ips cadastrados
     preserve_table()
@@ -101,7 +114,7 @@ def drop_ssh():
     match.comment = "Bloqueia SSH"
     # Comente este match para bloquear qualquer porta
     match = iptc.Match(rule, "tcp")
-    match.dport = "22"
+    match.dport = "9947"
     rule.add_match(match)
     chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
     chain.append_rule(rule)
@@ -118,19 +131,14 @@ def add_ip(ipcliente):
     chain.insert_rule(rule)
 
 @app.route("/del_ip", methods=["GET"])
-def del_ip():
-    simple_protect()
-    ipcliente = request.remote_addr, 200
-    rule = iptc.Rule()
-    rule.in_interface = interface
-    rule.src = ipcliente[0]
-    rule.protocol = "tcp"
-    rule.target = rule.create_target("ACCEPT")
-    match = rule.create_match("comment")
-    match.comment = "Regra temporaria de INPUT"
-    chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
-    chain.delete_rule(rule)
-    return jsonify({'status': 'removido', 'ip': ipcliente[0]})
+def block_all():
+    if request.remote_addr == "127.0.0.1":
+        flush_all()
+        drop_ssh()
+        return "OK"
+    else:
+        return "Wrong Access"
 
 if __name__ == '__main__':
     app.run(debug=False,host='0.0.0.0')
+
