@@ -1,13 +1,20 @@
 # -*- coding: utf-8 -*-
+import spfw_vars
 from flask import abort, redirect, url_for,request,jsonify,Flask
+from flask_httpauth import HTTPBasicAuth
+auth = HTTPBasicAuth()
 import iptc
 
 app = Flask(__name__)
-#app.config['SECRET_KEY'] = 'batata'
-app.secret_key = 'batata'
-secret = 'batata'
 interface  = "eth0"
 ports = ['22','80','443','3306','9947']
+
+# Pega a senha
+@auth.get_password
+def get_pw(username):
+    if username in spfw_vars.users:
+        return spfw_vars.users.get(username)
+    return None
 
 @app.route("/")
 def hello():
@@ -22,14 +29,14 @@ def simple_protect():
         abort(500)
 
 @app.route("/get_my_ip", methods=["GET"])
+@auth.login_required
 def get_my_ip():
-    simple_protect()
     ipcliente = jsonify({'ip': request.remote_addr}), 200
     return ipcliente
 
 @app.route("/flush_all", methods=["GET"])
+@auth.login_required
 def flush_all():
-    simple_protect()
     tb = iptc.Table(iptc.Table.FILTER)
     c = iptc.Chain(tb, 'INPUT')
     c.flush()
@@ -41,7 +48,6 @@ def flush_all():
     return jsonify({'status': 'flush'})
 
 def flush_ip():
-    simple_protect()
     tb = iptc.Table(iptc.Table.FILTER)
     c = iptc.Chain(tb, 'INPUT')
     c.flush()
@@ -87,8 +93,8 @@ def preserve_table():
                 chain.insert_rule(rule)
 
 @app.route("/add_my_ip", methods=["GET"])
+@auth.login_required
 def add_my_ip():
-    simple_protect()
     ipcliente = request.remote_addr, 200
     ipcliente = ipcliente[0]
     if ipcliente in open('ips.txt').read():
