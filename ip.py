@@ -2,12 +2,15 @@
 import spfw_vars
 from flask import abort, redirect, url_for,request,jsonify,Flask
 from flask_httpauth import HTTPBasicAuth
-auth = HTTPBasicAuth()
 import iptc
 
 app = Flask(__name__)
+
 interface  = "eth0"
 ports = ['22','80','443','3306','9947']
+
+# Autenticacao basica
+auth = HTTPBasicAuth()
 
 # Pega a senha
 @auth.get_password
@@ -98,8 +101,7 @@ def add_my_ip():
     ipcliente = request.remote_addr, 200
     ipcliente = ipcliente[0]
     if ipcliente in open('ips.txt').read():
-        return jsonify({'status': 'ip ja cadastrado'})
-        exit(0)
+        return jsonify({'status': 'ip ja cadastrado'}),200
     # Mantem ips cadastrados
     preserve_table()
     save_ip   = open("ips.txt", "a")
