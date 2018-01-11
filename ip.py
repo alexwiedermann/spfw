@@ -1,26 +1,25 @@
 # -*- coding: utf-8 -*-
-from flask import request
-from flask import jsonify
-from flask import Flask
+from flask import abort, redirect, url_for,request,jsonify,Flask
 import iptc
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'batata'
-
-
+#app.config['SECRET_KEY'] = 'batata'
+app.secret_key = 'batata'
+secret = 'batata'
 interface  = "eth0"
-port_block = "9947"
+ports = ['22','80','443','3306','9947']
 
 @app.route("/")
 def hello():
-    return 500
+    # I'm a teapot
+    abort(418)
 
 def simple_protect():
     secret = request.args.get('secret')
     if secret == "batata":
         return "OK"
     else:
-        exit(0)
+        abort(500)
 
 @app.route("/get_my_ip", methods=["GET"])
 def get_my_ip():
@@ -107,17 +106,18 @@ def add_my_ip():
 def drop_ssh():
     rule = iptc.Rule()
     rule.in_interface = interface
-    rule.src = "0.0.0.0/0"
-    rule.protocol = "tcp"
-    rule.target = rule.create_target("DROP")
-    match = rule.create_match("comment")
-    match.comment = "Bloqueia SSH"
-    # Comente este match para bloquear qualquer porta
-    match = iptc.Match(rule, "tcp")
-    match.dport = "9947"
-    rule.add_match(match)
-    chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
-    chain.append_rule(rule)
+    for port in ports:
+        rule.src = "0.0.0.0/0"
+        rule.protocol = "tcp"
+        rule.target = rule.create_target("DROP")
+        match = rule.create_match("comment")
+        match.comment = "Bloqueia porta" + port
+        # Comente este match para bloquear qualquer porta
+        match = iptc.Match(rule, "tcp")
+        match.dport = port
+        rule.add_match(match)
+        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
+        chain.append_rule(rule)
 
 def add_ip(ipcliente):
     rule = iptc.Rule()
@@ -140,5 +140,4 @@ def block_all():
         return "Wrong Access"
 
 if __name__ == '__main__':
-    app.run(debug=False,host='0.0.0.0')
-
+    app.run(debug=True,host='0.0.0.0')
