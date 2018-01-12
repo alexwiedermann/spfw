@@ -2,12 +2,13 @@
 import spfw_vars
 from flask import abort, redirect, url_for,request,jsonify,Flask
 from flask_httpauth import HTTPBasicAuth
+from flask.ext.script import Manager
 import iptc
-
+import threading
 app = Flask(__name__)
 
-interface  = "eth0"
-ports = ['22','80','443','3306','9947']
+interface  = "enp2s0"
+ports = "22,3306,5432,9947"
 
 # Autenticacao basica
 auth = HTTPBasicAuth()
@@ -23,13 +24,6 @@ def get_pw(username):
 def hello():
     # I'm a teapot
     abort(418)
-
-def simple_protect():
-    secret = request.args.get('secret')
-    if secret == "batata":
-        return "OK"
-    else:
-        abort(500)
 
 @app.route("/get_my_ip", methods=["GET"])
 @auth.login_required
@@ -56,7 +50,7 @@ def flush_ip():
     c.flush()
     allow_loopback()
     allow_established()
-    return jsonify({'status': 'flush'})
+    return jsonify({'status': 'flush'}),200
 
 def allow_loopback():
     chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
@@ -109,23 +103,24 @@ def add_my_ip():
     save_ip.close()
     add_ip(ipcliente)
     drop_ssh()
-    return jsonify({'status': 'adicionado', 'ip': ipcliente})
+    return jsonify({'status': 'adicionado', 'ip': ipcliente}),200
 
 def drop_ssh():
     rule = iptc.Rule()
     rule.in_interface = interface
-    for port in ports:
-        rule.src = "0.0.0.0/0"
-        rule.protocol = "tcp"
-        rule.target = rule.create_target("DROP")
-        match = rule.create_match("comment")
-        match.comment = "Bloqueia porta" + port
-        # Comente este match para bloquear qualquer porta
-        match = iptc.Match(rule, "tcp")
-        match.dport = port
-        rule.add_match(match)
-        chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
-        chain.append_rule(rule)
+    rule.src = "0.0.0.0/0"
+    rule.protocol = "tcp"
+    rule.target = rule.create_target("DROP")
+    match = rule.create_match("comment")
+    match.comment = "Bloqueia porta"
+    match = iptc.Match(rule, "tcp")
+    rule.add_match(match)
+    match = iptc.Match(rule, 'multiport')
+    # Comente este match para bloquear qualquer porta
+    match.dports = ports
+    rule.add_match(match)
+    chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "INPUT")
+    chain.append_rule(rule)
 
 def add_ip(ipcliente):
     rule = iptc.Rule()
@@ -147,5 +142,22 @@ def block_all():
     else:
         return "Wrong Access"
 
-if __name__ == '__main__':
-    app.run(debug=True,host='0.0.0.0')
+
+manager = Manager(app)
+
+@manager.command
+def runserver():
+    app.run(debug=False,host='0.0.0.0')
+    # FIXME
+    tb = iptc.Table(iptc.Table.FILTER)
+    c = iptc.Chain(tb, 'INPUT')
+    c.flush()
+    allow_loopback()
+    allow_established()
+    clear = open("ips.txt", "w")
+    clear.write("127.0.0.1" + "\n")
+    clear.close()
+    return jsonify({'status': 'flush'})
+
+if __name__ == "__main__":
+    manager.run()
